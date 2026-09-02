@@ -10,8 +10,11 @@ Prereqs:
      this script.
 
 Usage:
-  pip install google-auth-oauthlib google-api-python-client
-  python get_refresh_token.py
+  pip3 install google-auth-oauthlib google-api-python-client
+  python3 get_refresh_token.py
+
+If a browser doesn't open automatically, this script prints the
+authorization URL — copy-paste it into any browser manually.
 """
 
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -21,7 +24,11 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 def main() -> None:
     flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
-    creds = flow.run_local_server(port=0)
+
+    # open_browser=False forces the library to print the URL instead of relying
+    # on webbrowser.open() succeeding, which is flaky across terminals/shells.
+    # Copy the printed URL into any browser, approve access, then come back here.
+    creds = flow.run_local_server(port=0, open_browser=False)
 
     print("\n--- Save these as GitHub repo secrets ---")
     print(f"GMAIL_CLIENT_ID={creds.client_id}")

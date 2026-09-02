@@ -66,12 +66,16 @@ email was tagged the way it was.
    the repo root (it's gitignored, won't be committed).
 3. Locally:
    ```bash
-   pip install google-auth-oauthlib google-api-python-client
-   python get_refresh_token.py
+   pip3 install google-auth-oauthlib google-api-python-client
+   python3 get_refresh_token.py
    ```
    This opens a browser once for you to grant read-only Gmail access, then
    prints a `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, and `GMAIL_REFRESH_TOKEN`.
    Save all three — you won't see the refresh token again.
+
+   > **macOS note:** use `python3`/`pip3`, not `python`/`pip` — modern macOS
+   > doesn't ship a `python` command. If a browser doesn't open automatically,
+   > the script prints a URL — paste it into any browser manually.
 
 ### 2. Notion access
 
@@ -109,7 +113,7 @@ it runs without hitting Gmail or Notion. It runs automatically in CI on every
 push via `.github/workflows/tests.yml`.
 
 ```bash
-pip install -r requirements.txt -r requirements-dev.txt
+pip3 install -r requirements.txt -r requirements-dev.txt
 pytest -v
 ```
 
@@ -131,10 +135,10 @@ model trained on your corrections. Doable as a follow-up, out of scope here.
 ## Local testing
 
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 cp .env.example .env   # fill in values
 export $(cat .env | xargs)
-python src/main.py
+python3 src/main.py
 ```
 
 ## Notes / limitations
