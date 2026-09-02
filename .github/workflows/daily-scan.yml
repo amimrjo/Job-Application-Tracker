@@ -1,0 +1,40 @@
+name: Daily Job Application Scan
+
+on:
+  schedule:
+    # Runs at 00:05 UTC every day. GitHub Actions cron is always UTC, so adjust
+    # the hour to match your timezone's midnight (e.g. IST midnight = 18:35 UTC
+    # the previous day -> use "35 18 * * *").
+    - cron: "5 0 * * *"
+  workflow_dispatch:
+    inputs:
+      days_back:
+        description: "How many days back to scan (use 14 for the first-ever backfill run)"
+        required: false
+        default: "1"
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scan
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          NOTION_PARENT_PAGE_ID: ${{ secrets.NOTION_PARENT_PAGE_ID }}
+          DAYS_BACK: ${{ github.event.inputs.days_back || '1' }}
+        run: python src/main.py
