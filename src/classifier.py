@@ -55,6 +55,18 @@ OFFER_PATTERNS = [
     r"\bwe('re| are)? (pleased|excited|happy) to (offer|extend)", r"job offer", r"offer letter",
 ]
 
+# Job-board / talent-community DIGEST emails: "here are some roles you might like".
+# These are not applications you sent and not real recruiter contact -- they're
+# marketing blasts you're subscribed to (often after visiting a careers page once).
+# Checked BEFORE the generic hint gate so words like "opportunity"/"role" inside
+# these digests don't cause a false positive.
+JOB_DIGEST_PATTERNS = [
+    r"new jobs? posted", r"new job opportunit(y|ies)", r"job matches (for )?your search agent",
+    r"\btalent community\b", r"jobs? that might interest you", r"\bsee all opportunities\b",
+    r"\bjob alert\b", r"jobs? matching your (search|profile|preferences)",
+    r"recommended jobs? for you", r"jobs? based on your (profile|search)",
+]
+
 # Generic "is this even job related" gate — applied when nothing above hits,
 # to avoid tracking pure newsletters/spam.
 JOB_RELATED_HINT_PATTERNS = [
@@ -140,9 +152,19 @@ def classify(email: EmailMessage) -> Classification:
     is_interview = _matches_any(INTERVIEW_PATTERNS, text)
     is_rejection = _matches_any(REJECTION_PATTERNS, text)
     is_offer = _matches_any(OFFER_PATTERNS, text)
+    is_job_digest = _matches_any(JOB_DIGEST_PATTERNS, text)
     is_generic_job_hint = _matches_any(JOB_RELATED_HINT_PATTERNS, text)
 
-    is_job_related = any([is_recruiter, is_confirmation, is_interview, is_rejection, is_offer, is_generic_job_hint])
+    has_real_signal = any([is_recruiter, is_confirmation, is_interview, is_rejection, is_offer])
+
+    # A digest email ("here are some roles you might like") is only excluded when
+    # nothing else in it looks like a real, specific signal -- if a digest-style
+    # email also happens to mention an actual interview or confirmation, that
+    # real signal still wins and the email gets tracked.
+    if is_job_digest and not has_real_signal:
+        is_job_related = False
+    else:
+        is_job_related = has_real_signal or is_generic_job_hint
 
     if is_offer:
         category, next_action = "offer", "Review offer"

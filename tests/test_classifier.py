@@ -123,6 +123,55 @@ def test_unrelated_newsletter_is_skipped():
     assert result.is_job_related is False
 
 
+def test_job_board_digest_is_not_tracked_as_an_application():
+    # "You joined our talent community" mass mailers -- not an application you sent
+    email = make_email(
+        "Grainger Businesses",
+        "grainger-jobnotification@noreply.jobs2web.com",
+        "New jobs posted from Grainger Businesses",
+        "Thank you for joining the Grainger Businesses talent community! Joining our "
+        "talent community will allow us to notify you directly when roles aligned to "
+        "your interest present themselves. Please apply for any current openings that "
+        "fit your interest. The following jobs matched your search agent at Grainger "
+        "Businesses.",
+    )
+    result = classify(email)
+
+    assert result.is_job_related is False
+
+
+def test_recruiting_marketing_blast_is_not_tracked_as_recruiter_contact():
+    # A list of open roles blasted to a mailing list is not personal recruiter outreach
+    email = make_email(
+        "Texas Instruments Recruiting",
+        "ti_myhiring_no-reply@recruiting.ti.com",
+        "New job opportunities at Texas Instruments",
+        "Hello Amitha, We have new job opportunities that might interest you. Check "
+        "them out: Network Engineer, AI Solutions Engineer. See all opportunities. "
+        "Sincerely, Texas Instruments Recruiting team.",
+    )
+    result = classify(email)
+
+    assert result.is_job_related is False
+    assert result.is_recruiter is False
+
+
+def test_digest_pattern_does_not_override_a_real_signal():
+    # If a "digest-style" email ALSO contains a genuine interview invite, the real
+    # signal should still win and the email should be tracked.
+    email = make_email(
+        "Acme Corp",
+        "careers@acme.com",
+        "New job opportunities at Acme -- plus your interview invitation",
+        "We have new job opportunities you might like. Separately: we'd like to "
+        "schedule an interview for the position of Backend Engineer.",
+    )
+    result = classify(email)
+
+    assert result.is_job_related is True
+    assert result.category == "interview"
+
+
 def test_low_confidence_extraction_is_flagged_for_review():
     # No detectable role, sender is a personal-email-style address with no domain signal
     email = make_email(
