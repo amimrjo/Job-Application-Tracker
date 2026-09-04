@@ -1,5 +1,8 @@
 # Job Application Tracker
 
+![Tests](https://github.com/amimrjo/Job-Application-Tracker/actions/workflows/tests.yml/badge.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+
 Automatically scans your Gmail every day, figures out which emails are related to
 job applications you've sent, and keeps a running Notion database up to date —
 including catching **recruiter outreach** and **status updates** on applications
