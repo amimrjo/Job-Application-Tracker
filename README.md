@@ -154,3 +154,16 @@ python3 src/main.py
 - The classifier is intentionally conservative about "not job related" —
   tune the regex lists in `src/classifier.py` if it's missing or over-catching
   emails for your inbox's specific patterns.
+
+## Privacy
+
+This is a personal-use, single-user tool — not a service that handles data for
+other people. It reads your own Gmail inbox (read-only, via OAuth) and writes
+extracted application-tracking info (company, role, dates, email subject/link)
+to your own Notion workspace. No data is collected, stored, or transmitted by
+anyone other than you: this code runs entirely under your own Google Cloud
+project, GitHub Actions account, and Notion integration. Nothing is sent to
+any third-party server beyond Google's and Notion's own APIs, which you are
+already authorizing directly. You can revoke access at any time via
+[Google Account permissions](https://myaccount.google.com/permissions) and
+your Notion integration settings.
