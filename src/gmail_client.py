@@ -10,15 +10,54 @@ stored as GitHub Actions secrets so the daily workflow can run headlessly (no br
 from __future__ import annotations
 
 import base64
+import random
 import re
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+
+# Reasons Gmail's API uses for "back off and try again" -- as opposed to a
+# real error (bad auth, not-found, etc.) that retrying won't fix.
+_RETRYABLE_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"}
+
+
+def _execute_with_retry(request, max_retries: int = 6):
+    """
+    Run a googleapiclient request, retrying with exponential backoff + jitter
+    on Gmail's per-minute rate-limit errors. A burst of messages().get() calls
+    (e.g. a 14/30-day backfill) can trip 'Units per minute per user' even
+    though the daily account-wide quota is nowhere close to exhausted -- this
+    just means "slow down," not "something is broken."
+    """
+    for attempt in range(max_retries):
+        try:
+            return request.execute()
+        except HttpError as e:
+            reason = None
+            try:
+                reason = e.error_details[0].get("reason") if e.error_details else None
+            except (AttributeError, IndexError, KeyError):
+                pass
+
+            is_retryable = e.resp.status in (403, 429) and (
+                reason in _RETRYABLE_REASONS or "rate" in str(e).lower() or "quota" in str(e).lower()
+            )
+            if not is_retryable or attempt == max_retries - 1:
+                raise
+
+            # Exponential backoff with jitter: 1-2s, 2-4s, 4-8s, ...
+            sleep_for = (2**attempt) + random.uniform(0, 1)
+            print(f"  Rate limited by Gmail API, backing off {sleep_for:.1f}s (attempt {attempt + 1}/{max_retries})...")
+            time.sleep(sleep_for)
+
+    raise RuntimeError("unreachable")  # loop always returns or raises above
 
 
 @dataclass
@@ -109,15 +148,16 @@ def fetch_recent_emails(
     page_token = None
 
     while True:
-        resp = (
+        resp = _execute_with_retry(
             service.users()
             .messages()
             .list(userId="me", q=query, maxResults=min(100, max_results - len(results)), pageToken=page_token)
-            .execute()
         )
         ids = resp.get("messages", [])
-        for m in ids:
-            full = service.users().messages().get(userId="me", id=m["id"], format="full").execute()
+        for i, m in enumerate(ids):
+            full = _execute_with_retry(
+                service.users().messages().get(userId="me", id=m["id"], format="full")
+            )
             headers = {h["name"].lower(): h["value"] for h in full["payload"].get("headers", [])}
             sender_name, sender_email = _parse_sender(headers.get("from", ""))
             date_hdr = headers.get("date")
@@ -140,6 +180,12 @@ def fetch_recent_emails(
             )
             if len(results) >= max_results:
                 return results
+
+            # Light pacing between individual message fetches so a large
+            # backfill (days_back=14/30) doesn't burst past the per-minute
+            # quota in the first place -- cheaper than relying on retries alone.
+            if i < len(ids) - 1:
+                time.sleep(0.15)
 
         page_token = resp.get("nextPageToken")
         if not page_token:

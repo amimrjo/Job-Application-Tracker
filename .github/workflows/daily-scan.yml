@@ -16,6 +16,9 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
@@ -29,6 +32,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run scan
+        run: python src/main.py
         env:
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
@@ -37,5 +41,28 @@ jobs:
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           NOTION_PARENT_PAGE_ID: ${{ secrets.NOTION_PARENT_PAGE_ID }}
           DAYS_BACK: ${{ github.event.inputs.days_back || '1' }}
-        run: python src/main.py
 
+      # The Google Cloud OAuth app is left in "Testing" publishing status (see
+      # README), which means the Gmail refresh token expires roughly every 7
+      # days. Rather than silently losing days of tracking, open a GitHub
+      # Issue the moment that happens so it shows up as a real notification
+      # instead of something you'd only notice by checking the Actions tab.
+      - name: Open an issue if the scan failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING=$(gh issue list --repo "$GITHUB_REPOSITORY" --search "Gmail token likely expired" --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            echo "Issue #$EXISTING already open, skipping."
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "Gmail token likely expired — re-run get_refresh_token.py" \
+              --body "The Daily Job Application Scan failed (run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}). The most common cause is the Gmail OAuth refresh token expiring, which happens roughly every 7 days while the Google Cloud OAuth app is in Testing publishing status.
+
+          **Fix:**
+          1. Run \`python3 get_refresh_token.py\` locally.
+          2. Copy the new \`GMAIL_REFRESH_TOKEN\` value it prints.
+          3. Update it in this repo under Settings → Secrets and variables → Actions.
+          4. Re-run the workflow manually to confirm, then close this issue."
+          fi

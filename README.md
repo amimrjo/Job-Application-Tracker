@@ -154,6 +154,15 @@ python3 src/main.py
 - The classifier is intentionally conservative about "not job related" —
   tune the regex lists in `src/classifier.py` if it's missing or over-catching
   emails for your inbox's specific patterns.
+- **The Google Cloud OAuth app is left in "Testing" publishing status.**
+  Moving it to full Production requires verifying ownership of a public
+  homepage/privacy-policy domain via Google Search Console, which isn't
+  practical for a repo hosted under someone else's domain (`github.com`).
+  The tradeoff: the Gmail refresh token expires roughly every 7 days while
+  in Testing status. When that happens, the daily scan fails and **this repo
+  automatically opens a GitHub Issue** telling you to re-run
+  `get_refresh_token.py` and update the `GMAIL_REFRESH_TOKEN` secret — a
+  2-minute fix, just not a fully "set and forget forever" one.
 
 ## Privacy
 
